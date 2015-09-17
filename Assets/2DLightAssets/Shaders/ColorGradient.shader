@@ -1,8 +1,9 @@
-Shader "Gradient/No Texture/Radial/Single-Color/To Transparent/Regular UV/Alpha Blend" {
+Shader "Light2D/Color Gradient" {
 
 	//Set up the shader to receive external inputs from Unity
 	Properties {
-		_Color ("Color", Color) = (1,1,1,1)				//Receive input from a fixed Color
+		_Color1 ("Color 1", Color) = (1,1,1,1)				//Receive input from a fixed Color
+		_Color2 ("Color 2", Color) = (1,1,1,1)				//Receive input from a fixed Color
 		_UVXOffset ("UV X Offset", float) = 0			//Receive input from UV coordinate X offset
 		_UVYOffset ("UV Y Offset", float) = 0			//Receive input from UV coordinate Y offset
 		_UVXScale ("UV X Scale", float) = 1.0			//Receive input from UV X scale
@@ -43,7 +44,8 @@ Shader "Gradient/No Texture/Radial/Single-Color/To Transparent/Regular UV/Alpha 
 			//Unity variables to be made accessible to Vertex and/or Fragment shader
 			//uniform sampler2D _MainTex;					//Define _MainTex from Texture Unit 0 to be sampled in 2D
 			//uniform float4 _MainTex_ST;					//Use the Float _MainTex_ST to pass the Offset and Tiling for the texture(s)
-			uniform fixed4 _Color;							//Use the Color _Color provided by Unity
+			uniform fixed4 _Color1;							//Use the Color _Color provided by Unity
+			uniform fixed4 _Color2;							//Use the Color _Color provided by Unity
 			uniform float _UVXOffset;
 			uniform float _UVYOffset;
 			uniform float _UVXScale;
@@ -77,13 +79,13 @@ Shader "Gradient/No Texture/Radial/Single-Color/To Transparent/Regular UV/Alpha 
 				o.uv = half2((v.texcoord.x+_UVXOffset)*_UVXScale,(v.texcoord.y+_UVYOffset)*_UVYScale);	//Scale and position
 							//o.uv2 = v.texcoord1.xy;					//Send texture coords from unit 1 to fragment shader
 							//o.color = v.color;						//Send interpolated vertex color to fragment shader
-							//o.color = _Color;							//Send solid color to fragment shader
+							//o.color = _Color1;							//Send solid color to fragment shader
 				return o;									//Transmit data to the fragment shader
 			}
 
 			//Fragment shader
 			fixed4 frag(VertexToFragment i) : COLOR {
-				return fixed4(lerp(_Color,fixed4(_Color.rgb,0),sqrt( (i.uv.x*i.uv.x)+(i.uv.y*i.uv.y) )+_Offset ));	//Output radial gradient
+				return fixed4(lerp(_Color1,_Color2,sqrt( (i.uv.x*i.uv.x)+(i.uv.y*i.uv.y) )+_Offset ));	//Output radial gradient
 			}
 
 			ENDCG							//End of CG program

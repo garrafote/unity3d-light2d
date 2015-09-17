@@ -17,20 +17,16 @@ public class Light2D : MonoBehaviour {
 
     struct Vertex
     {
-        public float Angle;
+        public float PseudoAngle;
         public Vector3 Position;
         public VertexLocation Location;
         public bool IsEndpoint;
     }
-
-    [SerializeField]
-    private int lightSegments = 8;
-
-    [SerializeField]
-    private float lightRadius = 20f;
-
-    [SerializeField]
-    private Material lightMaterial;
+    
+    public  int lightSegments = 8;
+    public  float lightRadius = 100f;
+    public Material lightMaterial;
+    public LayerMask shadowMask = Physics.DefaultRaycastLayers;
 
     private PolygonCollider2D[] colliders;
     private List<Vertex> vertices;
@@ -39,8 +35,6 @@ public class Light2D : MonoBehaviour {
 
     private MeshFilter meshFilter;
     private MeshRenderer meshRenderer;
-
-    private System.Func<float, float, float> Atan2 = FastMath.Atan2;
 
     void Awake()
     {
@@ -89,6 +83,9 @@ public class Light2D : MonoBehaviour {
         {
             colliderVertices.Clear();
 
+            var touchDown = false;
+            var touchUp = false;
+
             // get polygon raycast vertices
             foreach (var point in collider.points)
             {
@@ -97,7 +94,7 @@ public class Light2D : MonoBehaviour {
                 var worldPoint = collider.transform.TransformPoint(point);
                 var distance = (worldPoint - transform.position).magnitude;
 
-                var hit = Physics2D.Raycast(transform.position, worldPoint - transform.position, distance);
+                var hit = Physics2D.Raycast(transform.position, worldPoint - transform.position, distance, shadowMask);
                 if (hit)
                 {
                     vertex.Position = hit.point;
@@ -114,7 +111,16 @@ public class Light2D : MonoBehaviour {
 
                 // vertex position is saved in light local space.
                 vertex.Position = transform.InverseTransformPoint(vertex.Position);
-                vertex.Angle = Atan2(vertex.Position.y, vertex.Position.x);
+                vertex.PseudoAngle = PseudoAtan2(vertex.Position.y, vertex.Position.x);
+
+                if (vertex.PseudoAngle < 0f)
+                {
+                    touchDown = true;
+                }
+                else if (vertex.PseudoAngle > 2f)
+                {
+                    touchUp = true;
+                }
 
 
                 if (vertex.Position.sqrMagnitude <= lightRadius * lightRadius)
@@ -126,25 +132,51 @@ public class Light2D : MonoBehaviour {
             // Identify endpoints
             if (colliderVertices.Count > 0)
             {
+                // sort by angle in ASCENDING order
+                colliderVertices.Sort((v1, v2) => v1.PseudoAngle.CompareTo(v2.PseudoAngle));
+                
                 var hiloVertices = new Vertex[2];
+                var loIndex = 0;
+                var hiIndex = colliderVertices.Count - 1;
 
-                // sort by angle
-                colliderVertices.Sort((v1, v2) => v2.Angle.CompareTo(v1.Angle));
+                if (touchDown && touchUp)
+                {
+                    var lowest = float.MaxValue;
+                    var highest = float.MinValue;
+
+                    for (int i = 0; i < colliderVertices.Count; i++) 
+                    {
+                        var v = colliderVertices[i];
+
+                        // from all angles that range from -inf to 1
+                        // we need to find the highest angle (closest to 1)
+                        // and from all angles rannging from 1 to inf
+                        // we nned to find the lowest angle (closest to 1)
+                        if (v.PseudoAngle < 1f && v.PseudoAngle > highest)
+                        {
+                            highest = v.PseudoAngle;
+                            hiIndex = i;
+                        }
+                        else if (v.PseudoAngle > 1f && v.PseudoAngle < lowest)
+                        {
+                            lowest = v.PseudoAngle;
+                            loIndex = i;
+                        }
+                    }
+                }
 
                 Vertex vertex;
-                vertex = colliderVertices[0];
+                vertex = colliderVertices[loIndex];
                 vertex.Location = VertexLocation.Right;
                 hiloVertices[0] = vertex;
-                colliderVertices[0] = vertex;
+                colliderVertices[loIndex] = vertex;
 
-                var lastIndex = colliderVertices.Count - 1;
-                vertex = colliderVertices[lastIndex];
+                vertex = colliderVertices[hiIndex];
                 vertex.Location = VertexLocation.Left;
                 hiloVertices[1] = vertex;
-                colliderVertices[lastIndex] = vertex;
+                colliderVertices[hiIndex] = vertex;
 
                 vertices.AddRange(colliderVertices);
-
 
                 foreach (var hiloVertex in hiloVertices)
                 {
@@ -154,10 +186,11 @@ public class Light2D : MonoBehaviour {
                     }
 
                     var position = transform.TransformPoint(hiloVertex.Position);
-                    var direction = (position - transform.position).normalized;
-                    position += direction * .01f;
+                    var distance = position - transform.position;
+                    var direction = distance.normalized;
+                    position += direction * .0001f;
 
-                    var hit = Physics2D.Raycast(position, direction, lightRadius);
+                    var hit = Physics2D.Raycast(position, direction, lightRadius, shadowMask);
 
                     var newVertexPosition = hit ? (Vector3)hit.point
                         : transform.TransformPoint(direction * lightRadius);
@@ -166,12 +199,14 @@ public class Light2D : MonoBehaviour {
 
                     vertex = new Vertex();
                     vertex.Position = transform.InverseTransformPoint(newVertexPosition);
-                    vertex.Angle = Atan2(newVertexPosition.y, newVertexPosition.x);
+                    vertex.PseudoAngle = PseudoAtan2(vertex.Position.y, vertex.Position.x);
 
                     vertices.Add(vertex);
                 }
 
             }
+
+            
 
         }
 
@@ -186,7 +221,7 @@ public class Light2D : MonoBehaviour {
 
             var vertex = new Vertex();
             vertex.Position = new Vector3(FastMath.SinArray[theta], FastMath.CosArray[theta], 0);
-            vertex.Angle = Atan2(vertex.Position.y, vertex.Position.x);
+            vertex.PseudoAngle = PseudoAtan2(vertex.Position.y, vertex.Position.x);
 
             vertex.Position *= lightRadius;
             vertex.Position += transform.position;
@@ -204,8 +239,8 @@ public class Light2D : MonoBehaviour {
             }
         }
 
-        // sort all vertices by angle
-        vertices.Sort((v1, v2) => v2.Angle.CompareTo(v1.Angle));
+        // sort all vertices by angle in a descending order
+        vertices.Sort((v1, v2) => v2.PseudoAngle.CompareTo(v1.PseudoAngle));
 
 
         var epsilon = 0.00001f;
@@ -215,7 +250,7 @@ public class Light2D : MonoBehaviour {
             var fstVertex = vertices[i];
             var sndVertex = vertices[i + 1];
 
-            if (Mathf.Abs(fstVertex.Angle - sndVertex.Angle) <= epsilon)
+            if (Mathf.Abs(fstVertex.PseudoAngle - sndVertex.PseudoAngle) <= epsilon)
             {
 
                 if (sndVertex.Location == VertexLocation.Right)
@@ -291,18 +326,14 @@ public class Light2D : MonoBehaviour {
         lightMesh.bounds = bounds;
     }
 
-    float pseudoAngle(float dy, float dx)
+    // This method emulates Atan2. 
+    // Although the output angle is highly innacurate this
+    // can be used as a pseudo angle comparator.
+    static float PseudoAtan2(float dy, float dx)
     {
-        // Hight performance for calculate angle on a vector (only for sort)
-        // APROXIMATE VALUES -- NOT EXACT!! //
         float ax = Mathf.Abs(dx);
         float ay = Mathf.Abs(dy);
         float p = dy / (ax + ay);
-        if (dx < 0)
-        {
-            p = 2 - p;
-
-        }
-        return p;
+        return dx < 0 ? 2 - p : p;
     }
 }

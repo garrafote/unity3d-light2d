@@ -3,12 +3,7 @@ using System.Collections;
 
 public class interface_touch: MonoBehaviour {
 	
-	GameObject cLight;
-	GameObject cubeL;
-	
-	//GUIText UIlights;
-	//GUIText UIvertex;
-
+	Light2D cLight;
 
 	[HideInInspector] public static int vertexCount;
 
@@ -22,7 +17,7 @@ public class interface_touch: MonoBehaviour {
 	
 	// Update is called once per frame
 	void Update () {
-		cLight = GameObject.Find("2DLight");
+		cLight = GameObject.FindObjectOfType<Light2D>();
 		//if(Input.GetAxis("Horizontal")){
 		//light.transform.position = new Vector3 (Input.mousePosition.x -Screen.width*.5f, Input.mousePosition.y -Screen.height*.5f);
 		Vector3 pos = cLight.transform.position;
@@ -35,19 +30,17 @@ public class interface_touch: MonoBehaviour {
 
 			Vector2 p = Camera.main.ScreenToWorldPoint(Input.mousePosition);
 
-			if(Input.GetKey(KeyCode.LeftControl) == true){
-				return; //************************************************************************************
-				Material m = new Material( cLight.GetComponent<DynamicLight>().lightMaterial as Material); 
-				
+			if(Input.GetKey(KeyCode.LeftControl)){
+				Material m = new Material( cLight.GetComponent<Light2D>().lightMaterial as Material); 
 
 				GameObject nLight = new GameObject();
 				nLight.transform.parent = cLight.transform;
 				
-				nLight.AddComponent<DynamicLight>();
+				nLight.AddComponent<Light2D>();
 				//m.color = new Color(Random.Range(0f,1f),Random.Range(0f,1f),Random.Range(0f,1f));
-				nLight.GetComponent<DynamicLight>().lightMaterial = m;
+				nLight.GetComponent<Light2D>().lightMaterial = m;
 				nLight.transform.position = p;
-				nLight.GetComponent<DynamicLight>().lightRadius = 40;
+				nLight.GetComponent<Light2D>().lightRadius = 40;
 				
 				GameObject quad = GameObject.CreatePrimitive(PrimitiveType.Quad);
 				quad.transform.parent = nLight.transform;
